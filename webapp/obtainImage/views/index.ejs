@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang "en">
+<head>
+	<meta charset = "UTF-8">
+	<meta name="viewport" content = "width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+
+</head>
+
+<body>
+
+	<div class="row">
+
+    <h1>CryptoImage Generator</h1>
+    <form class="col s12">
+
+      <div class="row">
+        <div class="input-field col s6">
+          <input id="first_name" type="text" class="validate">
+          <label for="first_name">First Name</label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="input-field col s6">
+          <input id="last_name" type="text" class="validate">
+          <label for="last_name">Last Name</label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="input-field col s6">
+          <input id="wallet_address" type="text" class="validate">
+          <label for="wallet_address">Address</label>
+        </div>
+      </div>
+ 
+      <input type="button" id='script' name="scriptbutton" value="Get Image" onclick="goPython()">
+
+      <script>
+
+        function goPython(){
+          const Http = new XMLHttpRequest();
+          const url='http://localhost:2222/submit';
+          Http.open("POST", url);
+          Http.setRequestHeader("Content-Type", "application/json");
+          Http.send(JSON.stringify({"msg": document.getElementById('wallet_address').value}));
+          Http.onreadystatechange = (e) => {
+            console.log("Http");
+            var img = document.createElement("img");
+            img.src = "ENCODED.png";
+            img.width = 200;
+            img.height = 300;
+            // This next line will just add it to the <body> tag
+            document.body.appendChild(img);
+          }
+        }
+
+      </script>
+
+    </form>
+
+  </div>
+        
+
+
+	<script
+	  src="https://code.jquery.com/jquery-3.5.0.min.js"
+	  integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="
+	  crossorigin="anonymous"></script>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+</body>
+</html>
