@@ -10,7 +10,7 @@
 </head>
 <body>
 	<div class = "container">
-		<h1>File Upload</h1>
+		<h1>CryptoImage Upload</h1>
         <%= typeof msg != 'undefined' ? msg : '' %>
 		<form action="/upload" method="POST" enctype="multipart/form-data">
             <div class="file-field input-field">
@@ -22,9 +22,37 @@
                     <input class="file-path validate" type="text">
                 </div>
             </div>
-            <button type="submit" class="btn">Submit</button>
+            <button type="submit" class="btn">Submit Image</button>
+			<button onclick="getMessage()" class="btn waves-effect waves-light" type="submit" name="action">Get Message
+			  <i class="material-icons right"></i>
+			</button>
         </form>
 	</div>
+
+	<script>
+		function getMessage() {
+  			
+  			var xhr = new XMLHttpRequest();
+  			const url='http://localhost:3000/getmessage';
+  			xhr.open('GET', url, true);
+  			xhr.setRequestHeader("Content-Type", "application/json");
+
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState === 4) {
+				    var element = document.createElement('a');
+					element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(xhr.response));
+					element.setAttribute('download', "ENCODED.txt");
+					element.style.display = 'none';
+					document.body.appendChild(element);
+					element.click();
+					document.body.removeChild(element);
+				}
+			}
+
+			xhr.send();
+      
+      	}
+	</script>
 
 	<script
 	  src="https://code.jquery.com/jquery-3.5.0.min.js"

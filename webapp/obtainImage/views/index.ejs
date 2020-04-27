@@ -28,34 +28,45 @@
           <label for="last_name">Last Name</label>
         </div>
       </div>
-
-      <div class="row">
-        <div class="input-field col s6">
-          <input id="wallet_address" type="text" class="validate">
-          <label for="wallet_address">Address</label>
-        </div>
+      
+      <div class="upload-wrapper">
+        <header>
+          <input type="file" onchange="goPython()">
+        </header>
+        <div id="show-text"></div>
       </div>
- 
-      <input type="button" id='script' name="scriptbutton" value="Get Image" onclick="goPython()">
 
       <script>
 
-        function goPython(){
-          const Http = new XMLHttpRequest();
-          const url='http://localhost:2222/submit';
-          Http.open("POST", url);
-          Http.setRequestHeader("Content-Type", "application/json");
-          Http.send(JSON.stringify({"msg": document.getElementById('wallet_address').value}));
-          Http.onreadystatechange = (e) => {
-            console.log("Http");
-            var img = document.createElement("img");
-            img.src = "ENCODED.png";
-            img.width = 200;
-            img.height = 300;
-            // This next line will just add it to the <body> tag
-            document.body.appendChild(img);
+      function goPython() {
+        var preview = document.getElementById('show-text');
+        var file = document.querySelector('input[type=file]').files[0];
+        var reader = new FileReader()
+
+        var textFile = /text.*/;
+
+        if (file.type.match(textFile)) {
+          reader.onload = function (event) {
+            const Http = new XMLHttpRequest();
+            const url='http://localhost:2222/submit';
+            Http.open("POST", url);
+            Http.setRequestHeader("Content-Type", "application/json");
+            Http.send(JSON.stringify({"msg": event.target.result}));
+            Http.onreadystatechange = (e) => {
+              console.log("Http");
+              var img = document.createElement("img");
+              img.src = "ENCODED.png";
+              img.width = 200;
+              img.height = 300;
+              // This next line will just add it to the <body> tag
+              document.body.appendChild(img);
+            }
           }
+        } else {
+          preview.innerHTML = "<span class='error'>It doesn't seem to be a text file!</span>";
         }
+        reader.readAsText(file);
+      }
 
       </script>
 
