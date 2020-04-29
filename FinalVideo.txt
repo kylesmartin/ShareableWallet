@@ -1,0 +1,7 @@
+https://drive.google.com/file/d/1xAYS1f-7yLf37_cXKxwR3nHoGHflX0Po/view?usp=sharing
+
+Although the FinalVideo.mp4 was able to be submitted to Blackboard properly,
+the file was too large to upload to Github. The link above can be used to view the video
+via Google Drive. I can try editing the video down to reduce file size, but that will
+take time and it won't be able to be done today (29 april 2020) if I'm to be able to
+pay attention to the final EC544 course lecture and then also complete Lab4 in time.
