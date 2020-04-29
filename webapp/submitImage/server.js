@@ -87,6 +87,7 @@ app.post('/upload', (req, res) => {
 
 app.get('/getmessage', (req, res) => {
     res.send(steg)
+    steg = "No image uploaded";
 });
 
 // Listening on port 3000

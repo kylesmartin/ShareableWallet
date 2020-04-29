@@ -16,7 +16,7 @@ def encode_image(image_location, msg):
     pattern = gcd(len(img), len(img[0]))
     for i in range(len(img)):
         for j in range(len(img[0])):
-            if (i+1 * j+1) % pattern == 0:
+            if (i+1 * j+1) % 2 == 0:
                 try:
                     img[i-1][j-1][0] = next(msg_gen)
                 except StopIteration:

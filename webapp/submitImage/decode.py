@@ -21,7 +21,7 @@ def decode_image(img_location):
     message = ''
     for i in range(len(img)):
         for j in range(len(img[0])):
-            if (i+1 * j+1) % pattern == 0:
+            if (i+1 * j+1) % 2 == 0:
                 if img[i-1][j-1][0] != 0:
                     message = message + chr(img[i-1][j-1][0])
                 else:
