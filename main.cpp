@@ -16,28 +16,11 @@ string CURRENT_PATH = "~/Desktop/EC544/test1";
 string getStringFromFile(string filename);
 void reformatPubFile(string filename);
 void reformatAESpasswordFile(string filename);
-void genKey(string name);
-struct Wallet{
-	string name, path, password, seed, xprv, xpub, address, pub;
-	void createWallet(string, string, string);
-};
-struct MultisigWallet{
-	string name, path, seed, password, xprv, xpub;
-	string address, redeemScript;
-	Wallet cosigner1, cosigner2, cosigner3;
-	void createMultisigAddress(string, string, string, Wallet, Wallet, Wallet);
-};
-//void createSteg(string walletName, string multisigName, string recipientName);
-struct Steg{
-	string name, recipientName;
-	Wallet wallet;
-	MultisigWallet multisigName;
-	//string Steame = multisigName+" "+walletName;
-	void createSteg(MultisigWallet, Wallet, string);
-	void decryptSteg();
-
-};
-
+void createWallet(string walletName);
+void createMultisig(string multisigName, vector<string> cosignersList, int multisigThreshold);
+void createSteg(string multisigName, string cosignerName, string keyName);
+void genKey(string keyName);
+void decryptSteg(string stegName, string keyName);
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,44 +78,42 @@ void genKey(string name){
 	return;
 }
 
-void Wallet::createWallet(string inputName, string inputPath, string inputPassword){
-	name = inputName; path = inputPath; password = inputPassword;
-	cout << "CURRENT WALLET: " << name << endl;
+void createWallet(string walletName){
+	int flag;
+	string name = walletName;
 	// Generate the wallet
-	string createWallet = "electrum create --wallet "+path+"/"+name+" --password "+password;
-	int flag = system(createWallet.c_str());
-	// Add wallet's seed to object
-	string seedFile = name+".seed";														
-	string seedRequest = "electrum getseed --wallet "+path+"/"+name+" --password "+password+" > "+seedFile;
+	string createWallet = "electrum create --wallet "+CURRENT_PATH+"/"+walletName;
+	flag = system(createWallet.c_str());
+	// Create file for wallet's seed
+	string seedRequest = "electrum getseed --wallet "+CURRENT_PATH+"/"+walletName+" > "+walletName+".seed";
 	flag = system(seedRequest.c_str());
-	seed = getStringFromFile(seedFile);													
-	// Add wallet's master private key (xprv) to object
-	string xprvFile = name+".xprv";
-	string xprvRequest = "electrum getmasterprivate --wallet "+path+"/"+name+" --password "+password+" > "+xprvFile;
+	// Create file for wallet's master private key (xprv)
+	string xprvRequest = "electrum getmasterprivate --wallet "+CURRENT_PATH+"/"+walletName+" > "+walletName+".xprv";
 	flag = system(xprvRequest.c_str());
-	xprv = getStringFromFile(xprvFile);
-	// Add wallet's master public key (mpk, xpub) to object
-	string xpubFile = name+".xpub";
-	string xpubRequest = "electrum getmpk --wallet "+path+"/"+name+" > "+xpubFile;
+	// Create file for wallet's master public key (mpk, xpub)
+	string xpubRequest = "electrum getmpk --wallet "+CURRENT_PATH+"/"+walletName+" > "+walletName+".xpub";
 	flag = system(xpubRequest.c_str());
-	xpub = getStringFromFile(xpubFile);
-	// Add unused wallet address
-	string addressFile = name+".address";
-	string addressRequest = "electrum getunusedaddress --wallet "+path+"/"+name+" > "+addressFile;
+	// Create file for wallet's address
+	string addressRequest = "electrum getunusedaddress --wallet "+CURRENT_PATH+"/"+walletName+" > "+walletName+".address";
 	flag = system(addressRequest.c_str());
-	address = getStringFromFile(addressFile);
-	// Add public key for wallet address
-	string pubFile = name+".pub";
-	string pubRequest = "electrum getpubkeys "+address+" --wallet "+path+"/"+name+" > "+pubFile;
+	string address = getStringFromFile(walletName+".address");
+	// Create file for wallet's public key for the available address
+	string pubRequest = "electrum getpubkeys "+address+" --wallet "+CURRENT_PATH+"/"+walletName+" > "+walletName+".pub";
 	flag = system(pubRequest.c_str());
-	reformatPubFile(pubFile);
-	pub = getStringFromFile(pubFile);
+	reformatPubFile(walletName+".pub");
 	return;
 }
 
-void MultisigWallet::createMultisigAddress(string inputName, string inputPath, string inputPassword, Wallet cosigner1, Wallet cosigner2, Wallet cosigner3){
-	name = inputName; path = inputPath; password = inputPassword;
-	string multisigRequest = "electrum createmultisig 2 '[\""+cosigner1.pub+"\", \""+cosigner2.pub+"\", \""+cosigner3.pub+"\"]' --wallet "+path+"/"+name+" > "+"tempFile.txt";
+void createMultisig(string multisigName, vector<string> cosignersList, int multisigThreshold){
+	string pub;
+	string multisigRequest = "electrum createmultisig "+to_string(multisigThreshold)+" '[\"";
+	for (int i = 0; i < cosignersList.size(); i++){
+		pub = getStringFromFile(cosignersList[i]+".pub");
+		multisigRequest.append(pub);
+		multisigRequest.append("\", \"");
+	}
+	multisigRequest.erase(multisigRequest.end()-3, multisigRequest.end());
+	multisigRequest = multisigRequest+"]' --wallet "+CURRENT_PATH+"/"+multisigName+" > "+"tempFile.txt";
 	int flag = system(multisigRequest.c_str());
 	ifstream file("tempFile.txt");
 	string word, lastWord, address, redeemScript;
@@ -146,109 +127,222 @@ void MultisigWallet::createMultisigAddress(string inputName, string inputPath, s
 	// Clean up multisig address and output to file
 	address.erase(address.end()-2, address.end());
 	address.erase(address.begin());
-	string createAddressFile = "echo "+address+" > "+name+".address";
+	string createAddressFile = "echo "+address+" > "+multisigName+".address";
 	flag = system(createAddressFile.c_str());
 	// Clean up multisig redeemScript and output to file
 	redeemScript.erase(redeemScript.end()-1, redeemScript.end());
 	redeemScript.erase(redeemScript.begin());
-	string createRsFile = "echo "+redeemScript+" > "+name+".rs";
+	string createRsFile = "echo "+redeemScript+" > "+multisigName+".rs";
 	flag = system(createRsFile.c_str());
-	// 
-	string multisigBalance = "echo balance > "+name+".balance";
-	flag = system(multisigBalance.c_str());
+	// Create a file with the multisig wallet balance
+	string getMultisigBalance = "electrum getbalance --wallet "+CURRENT_PATH+"/"+cosignersList[0]+" > "+multisigName+".balance";
+	flag = system(getMultisigBalance.c_str());
 	return;
 }
 
-void Steg::createSteg(MultisigWallet multisig, Wallet wallet, string recipientName){
-	name = multisig.name+"_cosigner"+wallet.name[wallet.name.length()-1];
+void createSteg(string multisigName, string cosignerName, string keyName){
+	string stegName = multisigName+"_"+cosignerName;
 	// Tar.gz the wallet, wallet peripheries, multisig RS into one folder
-	string tarStegFiles = "tar -czf "+name+".tar.gz "+multisig.name+".address "+multisig.name+".rs "+multisig.name+".balance "+wallet.name+" "+wallet.name+".address "+wallet.name+".pub "+wallet.name+".seed "+wallet.name+".xprv "+wallet.name+".xpub";
+	string tarStegFiles = "tar -czf "+stegName+".tar.gz "+multisigName+".address "+multisigName+".rs "+multisigName+".balance "+cosignerName+" "+cosignerName+".address "+cosignerName+".pub "+cosignerName+".seed "+cosignerName+".xprv "+cosignerName+".xpub";
 	int flag = system(tarStegFiles.c_str());
 	// Encrypt the tar.gz folder with AES
-	string genAESpassword = "od -t x8 "+multisig.name+".address > "+name+".password";
+	string genAESpassword = "od -t x8 "+multisigName+".address > "+stegName+".password";
 	flag = system(genAESpassword.c_str());
-	reformatAESpasswordFile(name+".password");
-	string AESpassword = getStringFromFile(name+".password");
-	string encryptAES = "openssl aes-256-cbc -a -in "+name+".tar.gz -out "+name+".tar.gz.enc -pbkdf2 -pass pass:"+AESpassword;
+	reformatAESpasswordFile(stegName+".password");
+	string AESpassword = getStringFromFile(stegName+".password");
+	string encryptAES = "openssl aes-256-cbc -a -in "+stegName+".tar.gz -out "+stegName+".tar.gz.enc -pbkdf2 -pass pass:"+AESpassword;
 	flag = system(encryptAES.c_str());
 	// Encrypt the password using recipient's RSA pub key, put everything into one final file before encoding in image
-	string encryptRSA = "openssl rsautl -encrypt -in "+name+".password -out "+name+".password.enc -pubin -inkey "+recipientName+"key.pub";
+	string encryptRSA = "openssl rsautl -encrypt -in "+stegName+".password -out "+stegName+".password.enc -pubin -inkey "+keyName+".pub";
 	flag = system(encryptRSA.c_str());
-	string tarRemainingFiles = "tar -czf "+name+" "+name+".tar.gz.enc "+name+".password.enc";
-	flag = system(tarRemainingFiles.c_str());/**/
+	string tarRemainingFiles = "tar -czf "+stegName+".bin "+stegName+".tar.gz.enc "+stegName+".password.enc";
+	flag = system(tarRemainingFiles.c_str());
+	// Convert the steg to base64 for encoding into the image
+	string encodeBase64 = "openssl base64 -in "+stegName+".bin -out "+stegName;
+	flag = system(encodeBase64.c_str());
 	return;
 }
 
-void Steg::decryptSteg(){
+void decryptSteg(string stegName, string keyName){
 	string multisigName, walletName;
+	// Decode the steg from base64 to bin
+	string decodeBase64 = "openssl base64 -d -in "+stegName+" -out "+stegName+".bin";
+	int flag = system(decodeBase64.c_str());
 	// Decompress the steg
-	string decompressSteg = "tar -xzf "+name;
-	int flag = system(decompressSteg.c_str());
+	string decompressSteg = "tar -xzf "+stegName+".bin";
+	flag = system(decompressSteg.c_str());
 	// Decrypt the RSA-encrypted password
-	string decryptRSA = "openssl rsautl -decrypt -inkey "+SELF_NAME+".pem -in "+name+".password.enc -out "+name+".password";
+	string decryptRSA = "openssl rsautl -decrypt -inkey "+keyName+".pem -in "+stegName+".password.enc -out "+stegName+".password";
 	flag = system(decryptRSA.c_str());
 	// Decrypt the AES-encrypted tar.gz folder
-	string AESpassword = getStringFromFile(name+".password");
-	string decryptAES = "openssl aes-256-cbc -d -a -in "+name+".tar.gz.enc -out "+name+".tar.gz -pbkdf2 -pass pass:"+AESpassword;
+	string AESpassword = getStringFromFile(stegName+".password");
+	string decryptAES = "openssl aes-256-cbc -d -a -in "+stegName+".tar.gz.enc -out "+stegName+".tar.gz -pbkdf2 -pass pass:"+AESpassword;
 	flag = system(decryptAES.c_str());
 	// Decompress the folder with the wallet and multisig information
-	string decompressFolder = "tar -xzf "+name+".tar.gz";
+	string decompressFolder = "tar -xzf "+stegName+".tar.gz";
 	flag = system (decompressFolder.c_str());
 	return;
 }
 
 
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
+// IF ACTING IN SENDER ROLE
 int main(){
-    cout << "Hello World!" << endl;
-	// STEP 0 - ESTABLISH THE CONTEXT
-    // Alice generates her wallet, adds $1 mBTC
-    Wallet w0;
-	w0.createWallet("wallet0",CURRENT_PATH,"000");
-    // Bob generates his 3 wallets
-    Wallet w1, w2, w3;
-	w1.createWallet("wallet1",CURRENT_PATH,"123");
-	w2.createWallet("wallet2",CURRENT_PATH,"456");
-	w3.createWallet("wallet3",CURRENT_PATH,"789");
-    // Bob generates a multisig address from the 3 wallets
-	MultisigWallet ms1;
-	ms1.createMultisigAddress("multisig1",CURRENT_PATH,"012",w1,w2,w3);
-    // Alice sends $1 mBTC to Bob's multisig address
-
-
-
-	// STEP 1 - BOB GIVES MULTISIG WALLET TO EVE VIA IMAGES
-    // Eve generates her RSA key pair, informs Bob of public key
-   	genKey("EVE");
-    // Bob encrypts each wallet+multisig into an individual steg (stegonograph)
-	Steg steg1, steg2, steg3;
-	steg1.createSteg(ms1,w1,"TEST");
-	steg2.createSteg(ms1,w2,"TEST");
-	steg3.createSteg(ms1,w3,"TEST");
-    // Each steg is encoded into an image
-    // Bob sends all three encoded images to Eve
-
-
-
-	// STEP 2 - EVE RECEIVES THE IMAGES, OPENS WALLET
- 	// Eve decodes each image to extract its embedded steg
-	// Eve decrypt each steg and collects all the wallets info inside
-	Steg steg1, steg2, steg3;
-	cout << "Enter name of first steg to decrypt: ";
-	cin >> steg1.name;
-	steg1.decryptSteg();
-	cout << "Enter name of second steg to decrypt: ";
-	cin >> steg2.name;
-	steg2.decryptSteg();
-	cout << "Enter name of third steg to decrypt: ";
-	cin >> steg3.name;
-	steg3.decryptSteg();
-	// Eve checks the amount available in the multisig address
-	// Eve requests an amount from the multisig address, approves the transaction from 2 of the 3 wallets
-    
+    int flag, multisigThreshold;
+    vector<string> cosignersList;
+	string input, keyName, walletName, status, stegName, multisigName, transactionAmount, cosignerName;
+	while(1){
+		cout << "PROGRAM: Enter '1' to create an Electrum wallet" << endl;
+		cout << "         Enter '2' to create a transaction between two Electrum wallets" << endl;
+		cout << "         Enter '3' to create an Electrum multisig wallet" << endl;
+		cout << "         Enter '4' to create an encrypted steg containing the multisig info" << endl;
+		cout << "         Enter '5' to encode a steg into an image" << endl;
+		cout << "         Type 'exit' to exit the program" << endl;
+		cout << "USER: ";
+		cin >> input;
+		cout << endl;
+		if (input == "1"){
+			cout << "PROGRAM: Please enter your desired Electrum wallet name." << endl << "USER: ";
+			cin >> walletName;
+			createWallet(walletName);
+			cout << "PROGRAM: The Electrum wallet '" << walletName << "' has been created." << endl << endl;
+		}
+		if (input == "2"){
+			// SEE OPTION '5' IN receiverMain.cpp main()
+		}
+		if (input == "3"){
+			cout << "PROGRAM: Please enter your desired Electrum multisig wallet name." << endl << "USER: ";
+			cin >> multisigName;
+			cout << "PROGRAM: Please enter the names of the multisig wallet cosigners, one at a time." << endl << "         (When all cosigners are entered, type 'finished'.)" << endl;
+			while (1){
+				cout << "USER: ";
+				cin >> cosignerName;
+				if (cosignerName == "finished")
+					break;
+				else
+					cosignersList.push_back (cosignerName);
+			}
+			cout << "PROGRAM: Please enter the number of cosigner signatures needed to" << endl << "         unlock funds from this multisig wallet." << endl << "USER: ";
+			cin >> multisigThreshold;
+			createMultisig(multisigName, cosignersList, multisigThreshold);
+			cout << "PROGRAM: The Electrum multisig wallet '" << multisigName << "' has been created." << endl << endl;
+		}
+		if (input == "4"){
+			cout << "PROGRAM: Please enter the name of the multisig wallet to be put into the steg." << endl << "USER: ";
+			cin >> multisigName;
+			cout << "PROGRAM: Please enter the name of the cosigner wallet to be put into the steg." << endl << "USER: ";
+			cin >> cosignerName;
+			cout << "PROGRAM: Please enter the name of the RSA key being used to encrypt the steg." << endl << "USER: ";
+			cin >> keyName;
+			createSteg(multisigName, cosignerName, keyName);
+			cout << "PROGRAM: The steg '" << multisigName << "_" << cosignerName << "' has been created and encrypted." << endl << endl;
+		}
+		if (input == "5"){
+			flag = system("gnome-terminal --window");
+			cout << "PROGRAM: In the newly-opened terminal window, type in 'npm start'." << endl << "         Then open your browser and enter 'localhost:2222' in the address bar." << endl << "         Use this page to upload a steg .txt file and encode it into a" << endl << "         randomly-selected image. Do this for as many stegs as needed." << endl;
+			while (1){
+				cout << "PROGRAM: When you are finished encoding all the desired stegs into images," << endl << "         close your browser, hit CTRL-C, and close the window." << endl << "         Then enter 'finished' below." << endl << "USER: ";
+				cin >> status;
+				if (status == "finished"){
+					cout << endl;
+					break;
+				}
+			}
+		}
+		if (input == "exit"){
+			break;
+		}
+		else if ((input != "1") && (input != "2") && (input != "3") && (input != "4") && (input != "5") && (input != "exit")){
+			cout << "PROGRAM: Entered response not recognized. Plase type 'exit' if you wish to exit the program." << endl << endl;;
+		}
+		cout << endl;
+	}
     return 0;
 }
+
+// IF ACTING IN RECEIVER ROLE
+/*
+int main(){
+    int flag;
+	string input, keyName, walletName, status, stegName, multisigName, transactionAmount, cosignerName, cosigner1Name, cosigner2Name, cosigner3Name;	
+	while(1){
+		cout << "PROGRAM: Enter '1' to generate an RSA key pair" << endl;
+		cout << "         Enter '2' to create an Electrum wallet" << endl;
+		cout << "         Enter '3' to extract a steg from an encoded image" << endl;
+		cout << "         Enter '4' to decrypt a steg" << endl;
+		cout << "         Enter '5' to request funds from a multisig wallet" << endl;
+		cout << "         Type 'exit' to exit the program" << endl;
+		cout << "USER: ";
+		cin >> input;
+		cout << endl;
+		if (input == "1"){
+			cout << "PROGRAM: Please enter your desired RSA key name." << endl << "USER: ";
+			cin >> keyName;
+			genKey(keyName);
+			cout << "PROGRAM: RSA key pair '" << keyName << ".pem' & '" << keyName << ".pub' has been generated." << endl << endl;
+		}
+		if (input == "2"){
+			cout << "PROGRAM: Please enter your desired Electrum wallet name." << endl << "USER: ";
+			cin >> walletName;
+			createWallet(walletName);
+			cout << "PROGRAM: The Electrum wallet '" << walletName << "' has been created." << endl << endl;
+		}
+		if (input == "3"){
+			flag = system("gnome-terminal --window");
+			//cout << "PROGRAM: In the newly-opened terminal window, type in 'npm start'." << endl << "         Then open your browser and enter 'localhost:3000' in the address bar." << endl << "         Use this page to upload an image encoded with a steg and download " << endl << "         the resulting steg .txt file into this current folder." << endl << "         Do this for as many stegs as you need." << endl;
+			while (1){
+				cout << "PROGRAM: When you are finished decoding all the desired stegs, close " << endl << "         your browser, hit CTRL-C, and close the window." << endl << "         Then enter 'finished' below." << endl << "USER: ";
+				cin >> status;
+				if (status == "finished"){
+					cout << endl;
+					break;
+				}
+			}
+		}
+		if (input == "4"){
+			cout << "PROGRAM: Please enter the name of the steg you would like to decrypt." << endl << "USER: ";
+			cin >> stegName;
+			cout << "PROGRAM: Please enter the name of the RSA key used to encrypt the steg." << endl << "USER: ";
+			cin >> keyName;
+			decryptSteg(stegName, keyName);
+			cout << "PROGRAM: The steg '" << stegName << "' has been decrypted." << endl << endl;
+		}
+		if (input == "5"){
+			cout << "PROGRAM: Please enter the name of the multisig wallet you are requesting funds from." << endl << "USER: ";
+			cin >> multisigName;
+			cout << "PROGRAM: This is the amount of bitcoin in that multisig wallet. (In the 'confirmed' row.)" << endl;
+			string getMultisigBalance = "cat "+multisigName+".balance";
+			flag =  system(getMultisigBalance.c_str());
+			cout << endl << "PROGRAM: How much are you requesting? (Enter '!' for the max amount.)" << endl << "USER: ";
+			cin >> transactionAmount;
+			cout << "PROGRAM: Please enter the name of the Electrum wallet these funds should be sent to." << endl << "USER: ";	
+			cin >> walletName;
+			cout << "PROGRAM: Please enter the name of the first multisig wallet cosigner." << endl << "USER: ";
+			cin >> cosignerName;
+			// "electrum payto walletName_ADDRESS ! --from_addr MULTISIG_ADDRESS - > signed1.txn"
+			while (1){
+				cout << "PROGRAM: Please enter the name of an additional multisig wallet cosigner. (If none additional needed, enter 'finished'.)" << endl << "USER: ";
+				cin >> cosignerName;
+				if (cosignerName == "finished"){
+					//"cat signed2.txn | electrum broadcast -"
+					break;
+				}
+				else{
+					//"cat signed1.txn | electrum signtransaction - > signed2.txn" 					
+				}
+			}
+			cout << "PROGRAM: FINISHED TRANSACTION" << endl << endl;
+		}
+		if (input == "exit"){
+			break;
+		}
+		else if ((input != "1") && (input != "2") && (input != "3") && (input != "4") && (input != "5") &&(input != "exit")){
+			cout << "PROGRAM: Entered response not recognized. Plase type 'exit' if you wish to exit the program." << endl << endl;;
+		}
+		cout << endl;
+	}
+    return 0;
+}
+*/
